@@ -1,0 +1,6 @@
+target/
+.idea/
+.vscode/
+*.log
+screenshots/
+src/test/resources/config.properties
