@@ -4,8 +4,7 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-
-import java.util.List;
+import org.openqa.selenium.support.ui.ExpectedConditions;
 
 public class LeavePage extends BasePage {
     private static final String APPLY_LEAVE_URL = "/leave/applyLeave";
@@ -22,6 +21,7 @@ public class LeavePage extends BasePage {
     private final By commentsField = By.xpath("//label[normalize-space()='Comments']/following::textarea[1]");
     private final By submitButton = By.xpath("//button[@type='submit' and normalize-space()='Apply']");
     private final By fieldErrors = FIELD_ERROR;
+    private final By formLoader = By.cssSelector(".oxd-form-loader");
 
     public LeavePage(WebDriver driver) {
         super(driver);
@@ -36,6 +36,7 @@ public class LeavePage extends BasePage {
         }
         wait.until(currentDriver -> isAtApplyUrl(currentDriver.getCurrentUrl())
                 && currentDriver.findElements(applyLeaveTitle).stream().anyMatch(WebElement::isDisplayed));
+        waitForFormReady();
     }
 
     public boolean isApplyPageDisplayed() {
@@ -47,17 +48,18 @@ public class LeavePage extends BasePage {
         return url.contains(APPLY_LEAVE_URL);
     }
 
-    public boolean hasLeaveTypeOptions() {
-        return !elements(leaveTypeDropdown).isEmpty();
-    }
-
     public void selectLeaveType(String leaveType) {
+        waitForFormReady();
         click(leaveTypeDropdown);
-        WebElement option = elements(leaveTypeOptions).stream()
+        WebElement option = wait.until(currentDriver -> currentDriver.findElements(leaveTypeOptions).stream()
                 .filter(candidate -> candidate.getText().trim().equals(leaveType))
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Leave type is not available: " + leaveType));
+                .orElse(null));
+        if (option == null) {
+            throw new AssertionError("Leave type is not available: " + leaveType);
+        }
         option.click();
+        waitForFormReady();
     }
 
     public void enterFromDate(String start) {
@@ -69,6 +71,7 @@ public class LeavePage extends BasePage {
     }
 
     public String toDate() {
+        waitForFormReady();
         return value(toDate);
     }
 
@@ -78,27 +81,30 @@ public class LeavePage extends BasePage {
     }
 
     private void enterDate(By locator, String expectedDate) {
-        WebElement dateInput = visible(locator);
+        waitForFormReady();
+        WebElement dateInput = wait.until(ExpectedConditions.elementToBeClickable(locator));
         dateInput.click();
         dateInput.sendKeys(Keys.CONTROL, "a");
         dateInput.sendKeys(Keys.BACK_SPACE);
         dateInput.sendKeys(expectedDate);
         dateInput.sendKeys(Keys.TAB);
 
-        String actualDate = dateInput.getAttribute("value");
-        if (!expectedDate.equals(actualDate)) {
-            throw new IllegalStateException(
-                    "Date field did not accept the requested value. Expected: "
-                            + expectedDate + ", actual: " + actualDate);
-        }
+        wait.until(currentDriver -> expectedDate.equals(
+                currentDriver.findElement(locator).getAttribute("value")));
     }
 
     public void addComment(String comment) {
+        waitForFormReady();
         replaceText(commentsField, comment);
     }
 
     public void submitRequest() {
+        waitForFormReady();
         click(submitButton);
+    }
+
+    private void waitForFormReady() {
+        wait.until(ExpectedConditions.invisibilityOfElementLocated(formLoader));
     }
 
     public String waitForSubmissionFeedback() {

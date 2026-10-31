@@ -21,6 +21,8 @@ public class EmployeeListPage extends BasePage {
     private final By employeeIdFilter = By.xpath(
             "//div[contains(@class,'oxd-input-group')][.//label[normalize-space()='Employee Id']]//input");
     private final By tableRows = By.cssSelector(".oxd-table-card");
+    private final By tableHeaders = By.cssSelector(".oxd-table-header-cell");
+    private final By tableCells = By.cssSelector(".oxd-table-cell");
     private final By tableLoader = By.cssSelector(".oxd-table-loader");
     private final By autocompleteOptions = By.cssSelector(".oxd-autocomplete-option");
     private final By rowActionButtons = By.cssSelector("button.oxd-icon-button");
@@ -40,7 +42,7 @@ public class EmployeeListPage extends BasePage {
                 click(employeeListTab);
             }
         }
-        visible(searchButton);
+        waitForSearchButton();
         return this;
     }
 
@@ -61,7 +63,7 @@ public class EmployeeListPage extends BasePage {
         }
 
         EmployeeFormPage employeeForm = new EmployeeFormPage(driver);
-        employeeForm.waitUntilDisplayed();
+        employeeForm.waitUntilEmployeeDetailsLoaded(expectedName);
         return employeeForm;
     }
 
@@ -69,7 +71,7 @@ public class EmployeeListPage extends BasePage {
         replaceText(employeeNameFilter, name);
         chooseFirstSuggestionIfPresent();
         click(searchButton);
-        waitForSearchResults();
+        waitForSearchResults(name);
     }
 
     public void searchByNameAndId(String name, String id) {
@@ -77,13 +79,30 @@ public class EmployeeListPage extends BasePage {
         chooseFirstSuggestionIfPresent();
         replaceText(employeeIdFilter, id);
         click(searchButton);
-        waitForSearchResults();
+        waitForSearchResults(id);
     }
 
     public void searchById(String id) {
         replaceText(employeeIdFilter, id);
         click(searchButton);
+        waitForSearchResults(id);
+    }
+
+    public void searchAll() {
+        click(searchButton);
         waitForSearchResults();
+    }
+
+    public EmployeeSummary firstEmployee() {
+        WebElement row = wait.until(currentDriver ->
+                currentDriver.findElements(tableRows).stream().findFirst().orElse(null));
+        List<WebElement> headers = elements(tableHeaders);
+        List<WebElement> cells = row.findElements(tableCells);
+        String firstName = cellValue(headers, cells, header -> header.contains("first"));
+        String lastName = cellValue(headers, cells, header -> header.equals("last name"));
+        String employeeId = cellValue(headers, cells,
+                header -> header.equals("employee id") || header.equals("id"));
+        return new EmployeeSummary(firstName, lastName, employeeId);
     }
 
     public boolean hasEmployeeResult(String expectedText) {
@@ -190,6 +209,30 @@ public class EmployeeListPage extends BasePage {
         });
     }
 
+    private void waitForSearchButton() {
+        wait.until(currentDriver -> currentDriver.findElements(searchButton).stream()
+                .anyMatch(WebElement::isDisplayed));
+    }
+
+    private void waitForSearchResults(String expectedResult) {
+        String normalizedExpected = normalize(expectedResult);
+        wait.until(currentDriver -> {
+            try {
+                boolean loading = currentDriver.findElements(tableLoader).stream()
+                        .anyMatch(WebElement::isDisplayed);
+                boolean expectedRow = currentDriver.findElements(tableRows).stream()
+                        .map(WebElement::getText)
+                        .map(EmployeeListPage::normalize)
+                        .anyMatch(rowText -> rowText.contains(normalizedExpected));
+                boolean noRecords = currentDriver.findElements(noRecordsMessage).stream()
+                        .anyMatch(WebElement::isDisplayed);
+                return !loading && (expectedRow || noRecords);
+            } catch (StaleElementReferenceException exception) {
+                return false;
+            }
+        });
+    }
+
     private WebElement findEmployeeRow(String expectedText) {
         WebElement row = findEmployeeRowIfPresent(expectedText);
         if (row == null) {
@@ -208,5 +251,28 @@ public class EmployeeListPage extends BasePage {
 
     private static String normalize(String value) {
         return value.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+    }
+
+    private String cellValue(
+            List<WebElement> headers,
+            List<WebElement> cells,
+            java.util.function.Predicate<String> headerMatcher) {
+        for (int index = 0; index < headers.size(); index++) {
+            if (headerMatcher.test(normalize(headers.get(index).getText()))) {
+                if (index >= cells.size()) {
+                    throw new IllegalStateException("Employee row is missing a table cell");
+                }
+                return cells.get(index).getText().trim();
+            }
+        }
+        throw new IllegalStateException(
+                "Employee table is missing a required column. Available columns: "
+                        + headers.stream().map(WebElement::getText).toList());
+    }
+
+    public record EmployeeSummary(String firstName, String lastName, String employeeId) {
+        public String fullName() {
+            return (firstName + " " + lastName).trim();
+        }
     }
 }

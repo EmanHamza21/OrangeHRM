@@ -42,7 +42,7 @@ src/test/resources/
 	testng.xml
 ```
 
-The driver uses explicit waits and zero implicit wait. Employee results are located by meaningful row content, not row index. Test data uses a unique timestamp suffix. Employee cleanup is attempted after the lifecycle scenario; because the public demo is shared and permissions can vary, cleanup is best-effort. The leave scenario submits a real request and does not automatically cancel it, since cancellation permissions and leave balance availability are account-dependent. Use a dedicated test account where possible and inspect/cancel pending demo requests manually.
+The driver uses explicit waits and zero implicit wait. Employee results are located by meaningful row content, not row index. Test data uses a unique timestamp suffix. Employee cleanup is attempted after scenarios that create employees; because the public demo is shared and permissions can vary, cleanup is best-effort. The valid leave test submits a one-day request, verifies its comment and calculated duration, then cancels the pending request to avoid leaving it active. Use a dedicated test account where possible.
 
 ## Execute Tests
 
@@ -82,13 +82,13 @@ The suite captures evidence at dashboard/login, employee creation, employee sear
 ## Automated Coverage
 
 - Login controls, valid login, dashboard, and logged-in user display.
-- Employee create with generated data, generated ID, dynamic search, details, edit, refresh persistence, return-navigation persistence, combined name/ID filters, and filter reset.
-- Required-field employee validation; the invalid record is not saved.
-- Leave request with a future weekday range, comment, success notification, listed dates, and pending approval status.
-- Invalid leave range where the end precedes the start date.
+- Employee search for an existing demo employee using a dynamically discovered name; employee create with generated data and ID; list search and reopened-record verification; edit with persistence across refresh and navigation; combined name/ID filters and filter reset.
+- Required-last-name validation with a follow-up list search confirming no employee was created.
+- Leave request with generated future dates; success notification; persisted comment, one-day calculation, listed request, and Pending Approval status; cancellation of the pending request.
+- Invalid leave range where the end precedes the start date, with a follow-up My Leave search confirming no request was created.
 - Best-effort cleanup of the generated employee.
 
-The public demo may not have a usable leave type/balance for the configured account. Such environment-dependent failures should be recorded with the report and not mistaken for a product defect without confirming the account setup.
+Leave tests use the configured leave type and require the test account to have an eligible leave balance. Configure an appropriate leave entitlement for the account before running these scenarios.
 
 ## Manual QA Assessment: Employee Leave Request
 

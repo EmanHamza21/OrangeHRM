@@ -39,7 +39,7 @@ public abstract class BasePage {
     }
 
     protected void replaceText(By locator, String value) {
-        WebElement element = visible(locator);
+        WebElement element = wait.until(ExpectedConditions.elementToBeClickable(locator));
         element.click();
         element.sendKeys(Keys.CONTROL, "a");
         element.sendKeys(Keys.BACK_SPACE);

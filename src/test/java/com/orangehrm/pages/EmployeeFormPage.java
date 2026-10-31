@@ -26,15 +26,34 @@ public class EmployeeFormPage extends BasePage {
         visible(lastNameField);
     }
 
-    public void createEmployee(String firstName, String middleName, String lastName) {
-        waitForFormReady();
-        replaceText(firstNameField, firstName);
-        replaceText(middleNameField, middleName);
-        replaceText(lastNameField, lastName);
+    public void waitUntilEmployeeDetailsLoaded(String expectedEmployeeId) {
+        waitUntilDisplayed();
+        wait.until(currentDriver -> {
+            String actualEmployeeId = currentDriver.findElement(employeeIdField).getAttribute("value");
+            String actualFirstName = currentDriver.findElement(firstNameField).getAttribute("value");
+            String actualLastName = currentDriver.findElement(lastNameField).getAttribute("value");
+            return expectedEmployeeId.equals(actualEmployeeId)
+                    && !actualFirstName.isBlank()
+                    && !actualLastName.isBlank();
+        });
+    }
+
+    public void createEmployee(String firstName, String middleName, String lastName, String employeeId) {
+        replaceFormField(firstNameField, firstName);
+        replaceFormField(middleNameField, middleName);
+        replaceFormField(lastNameField, lastName);
+        replaceFormField(employeeIdField, employeeId);
         saveWhenFormReady();
     }
 
     public void submitEmptyEmployeeForm() {
+        saveWhenFormReady();
+    }
+
+    public void submitWithMissingLastName(String firstName) {
+        replaceFormField(firstNameField, firstName);
+        replaceFormField(middleNameField, "Test");
+        replaceFormField(lastNameField, "");
         saveWhenFormReady();
     }
 
@@ -92,9 +111,13 @@ public class EmployeeFormPage extends BasePage {
     }
 
     public void updateFirstName(String firstName) {
-        waitForFormReady();
-        replaceText(firstNameField, firstName);
+        replaceFormField(firstNameField, firstName);
         saveWhenFormReady();
+    }
+
+    private void replaceFormField(By locator, String text) {
+        waitForFormReady();
+        replaceText(locator, text);
     }
 
     private void saveWhenFormReady() {

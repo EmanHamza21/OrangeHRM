@@ -5,10 +5,12 @@ import com.orangehrm.pages.EmployeeFormPage;
 import com.orangehrm.pages.EmployeeListPage;
 import org.testng.Assert;
 import org.testng.Reporter;
+import org.testng.SkipException;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Listeners;
 import org.testng.annotations.Test;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Listeners(ExtentTestListener.class)
 public class EmployeeTest extends BaseTest {
@@ -27,7 +29,8 @@ public class EmployeeTest extends BaseTest {
         employeeFormPage.createEmployee(
                 employeeUnderTest.firstName(),
                 employeeUnderTest.middleName(),
-                employeeUnderTest.lastName());
+                employeeUnderTest.lastName(),
+                employeeUnderTest.employeeId());
 
         Assert.assertTrue(employeeFormPage.waitForSaveFeedback().contains("Successfully Saved"),
                 "Employee creation should show a success notification");
@@ -36,9 +39,8 @@ public class EmployeeTest extends BaseTest {
         Assert.assertEquals(employeeFormPage.firstName(), employeeUnderTest.firstName());
         Assert.assertEquals(employeeFormPage.lastName(), employeeUnderTest.lastName());
 
-        employeeUnderTest = employeeUnderTest.withEmployeeId(employeeFormPage.employeeId());
-        Assert.assertFalse(employeeUnderTest.employeeId().isBlank(),
-                "An employee ID should be generated");
+        Assert.assertEquals(employeeFormPage.employeeId(), employeeUnderTest.employeeId(),
+                "The unique employee ID should be saved");
         captureCheckpoint("employee-created");
     }
 
@@ -58,6 +60,29 @@ public class EmployeeTest extends BaseTest {
     }
 
     @Test(groups = {"regression", "employee"})
+    public void existingEmployeeCanBeFoundByName() {
+        login();
+        EmployeeListPage employeeListPage = new EmployeeListPage(driver).open();
+        employeeListPage.searchAll();
+        if (!employeeListPage.hasAnyEmployeeResults()) {
+            throw new SkipException("The demo currently has no existing employee records to search.");
+        }
+        EmployeeListPage.EmployeeSummary existingEmployee = employeeListPage.firstEmployee();
+
+        Assert.assertFalse(existingEmployee.employeeId().isBlank(),
+                "The existing employee should have an employee ID");
+        Assert.assertFalse(existingEmployee.fullName().isBlank(),
+                "The existing employee should have a name");
+
+        employeeListPage.searchByName(existingEmployee.fullName());
+        Assert.assertTrue(employeeListPage.hasEmployeeResult(existingEmployee.employeeId()),
+                "Searching the existing employee by name should return the same employee ID");
+        Assert.assertTrue(employeeListPage.matchingRowText(existingEmployee.employeeId())
+                        .contains(existingEmployee.lastName()),
+                "The matching result should show the existing employee's last name");
+    }
+
+    @Test(groups = {"regression", "employee"})
     public void employeeCanBeFoundById() {
         employeeUnderTest = createEmployeeFixture();
 
@@ -67,6 +92,22 @@ public class EmployeeTest extends BaseTest {
         Assert.assertTrue(employeeListPage.hasEmployeeResult(employeeUnderTest.employeeId()),
                 "ID search should return the created employee");
         captureCheckpoint("employee-search-by-id");
+    }
+
+    @Test(groups = {"regression", "employee"})
+    public void createdEmployeeCanBeReopenedWithPersistedDetails() {
+        employeeUnderTest = createEmployeeFixture();
+
+        EmployeeListPage employeeListPage = new EmployeeListPage(driver).open();
+        employeeListPage.searchById(employeeUnderTest.employeeId());
+        EmployeeFormPage employeeFormPage = employeeListPage.openEmployee(employeeUnderTest.employeeId());
+
+        Assert.assertEquals(employeeFormPage.waitForFirstName(employeeUnderTest.firstName()),
+                employeeUnderTest.firstName());
+        Assert.assertEquals(employeeFormPage.lastName(), employeeUnderTest.lastName());
+        Assert.assertEquals(employeeFormPage.employeeId(), employeeUnderTest.employeeId());
+        Assert.assertTrue(employeeFormPage.detailsAreAccessible(),
+                "The reopened employee record should expose its details");
     }
 
     @Test(groups = {"regression", "employee"})
@@ -92,6 +133,12 @@ public class EmployeeTest extends BaseTest {
         employeeFormPage = new EmployeeFormPage(driver);
         Assert.assertEquals(employeeFormPage.waitForFirstName(updatedFirstName), updatedFirstName,
                 "Updated employee name should remain after refreshing the details page");
+
+        employeeListPage = new EmployeeListPage(driver).open();
+        employeeListPage.searchById(employeeUnderTest.employeeId());
+        employeeFormPage = employeeListPage.openEmployee(employeeUnderTest.employeeId());
+        Assert.assertEquals(employeeFormPage.waitForFirstName(updatedFirstName), updatedFirstName,
+                "Updated employee name should remain after navigating away and reopening the record");
     }
 
     @Test(groups = {"regression", "employee"})
@@ -133,13 +180,19 @@ public class EmployeeTest extends BaseTest {
         login();
         EmployeeListPage employeeListPage = new EmployeeListPage(driver).open();
         EmployeeFormPage employeeFormPage = employeeListPage.openAddEmployee();
-        employeeFormPage.submitEmptyEmployeeForm();
+        String uniqueFirstName = "Invalid" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        employeeFormPage.submitWithMissingLastName(uniqueFirstName);
 
         Assert.assertTrue(employeeFormPage.hasFieldError(),
                 "Required employee fields should show validation");
         Assert.assertTrue(employeeFormPage.isDisplayed(),
                 "The invalid form should remain on the add page");
         captureCheckpoint("employee-required-validation");
+
+        employeeListPage = new EmployeeListPage(driver).open();
+        employeeListPage.searchByName(uniqueFirstName);
+        Assert.assertTrue(employeeListPage.hasNoEmployeeResults(),
+                "An employee with a missing required last name must not be created");
     }
 
     @AfterMethod(alwaysRun = true)
@@ -174,7 +227,8 @@ public class EmployeeTest extends BaseTest {
         employeeFormPage.createEmployee(
                 employeeUnderTest.firstName(),
                 employeeUnderTest.middleName(),
-                employeeUnderTest.lastName());
+                employeeUnderTest.lastName(),
+                employeeUnderTest.employeeId());
         Assert.assertTrue(employeeFormPage.waitForSaveFeedback().contains("Successfully Saved"),
                 "Test employee fixture should be created successfully");
 
@@ -186,7 +240,8 @@ public class EmployeeTest extends BaseTest {
 
     private EmployeeRecord newEmployeeRecord() {
         String uniqueSuffix = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-        return new EmployeeRecord(FIRST_NAME, MIDDLE_NAME, "QA" + uniqueSuffix, null);
+        String employeeId = Integer.toString(ThreadLocalRandom.current().nextInt(100_000, 1_000_000));
+        return new EmployeeRecord(FIRST_NAME, MIDDLE_NAME, "QA" + uniqueSuffix, employeeId);
     }
 
     private record EmployeeRecord(

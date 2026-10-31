@@ -50,6 +50,11 @@ public class MyLeavePage extends BasePage {
     private final By tableCells = By.cssSelector(".oxd-table-cell");
     private final By requestRows = By.cssSelector(".oxd-table-card");
     private final By cancelButton = By.xpath(".//button[normalize-space()='Cancel']");
+    private final By cancelConfirmationButton = By.xpath(
+            "//button[normalize-space()='Yes, Confirm' or normalize-space()='Yes, Cancel' "
+                    + "or normalize-space()='Confirm']");
+    private final By tableLoader = By.cssSelector(".oxd-table-loader");
+    private final By noRecordsMessage = By.xpath("//*[contains(normalize-space(), 'No Records Found')]");
 
     public MyLeavePage(WebDriver driver) {
         super(driver);
@@ -105,6 +110,7 @@ public class MyLeavePage extends BasePage {
                 currentDriver.findElement(fromDate).getAttribute("value")));
         retainPendingApprovalStatus();
         click(searchButton);
+        waitForSearchResults();
     }
 
     private void retainPendingApprovalStatus() {
@@ -146,6 +152,43 @@ public class MyLeavePage extends BasePage {
 
     public boolean containsRequest(LocalDate date, String leaveType) {
         return matchingRequestRow(date, leaveType) != null;
+    }
+
+    public boolean containsRequest(LocalDate date, String leaveType, String comment) {
+        return matchingRequestRow(date, leaveType, comment) != null;
+    }
+
+    public String requestNumberOfDays(LocalDate date, String leaveType, String comment) {
+        WebElement row = requireRequestRow(date, leaveType, comment);
+        return cellValue(row, "number of days");
+    }
+
+    public boolean requestHasComment(LocalDate date, String leaveType, String comment) {
+        WebElement row = matchingRequestRow(date, leaveType, comment);
+        return row != null && row.getText().contains(comment);
+    }
+
+    public String cancelRequest(LocalDate date, String leaveType, String comment) {
+        WebElement row = requireRequestRow(date, leaveType, comment);
+        row.findElement(cancelButton).click();
+
+        if (visibleWithin(cancelConfirmationButton, 2)) {
+            click(cancelConfirmationButton);
+        }
+
+        String feedback = wait.until(currentDriver ->
+                currentDriver.findElements(NOTIFICATION).stream()
+                        .filter(WebElement::isDisplayed)
+                        .map(WebElement::getText)
+                        .filter(text -> !text.isBlank())
+                        .findFirst()
+                        .orElse(null));
+        wait.until(currentDriver -> matchingRequestRow(date, leaveType, comment) == null);
+        return feedback;
+    }
+
+    public void waitForRequestToBeAbsent(LocalDate date, String leaveType, String comment) {
+        wait.until(currentDriver -> matchingRequestRow(date, leaveType, comment) == null);
     }
 
     public void waitForRequest(LocalDate date, String leaveType) {
@@ -194,6 +237,10 @@ public class MyLeavePage extends BasePage {
     }
 
     private WebElement matchingRequestRow(LocalDate date, String leaveType) {
+        return matchingRequestRow(date, leaveType, null);
+    }
+
+    private WebElement matchingRequestRow(LocalDate date, String leaveType, String comment) {
         String orangeHrmDate = date.format(ORANGEHRM_DATE);
         String isoDate = date.format(ISO_DATE);
         return elements(requestRows).stream()
@@ -201,10 +248,47 @@ public class MyLeavePage extends BasePage {
                 .filter(row -> {
                     String text = row.getText();
                     return (text.contains(orangeHrmDate) || text.contains(isoDate))
-                            && text.contains(leaveType);
+                            && text.contains(leaveType)
+                            && (comment == null || text.contains(comment));
                 })
                 .findFirst()
                 .orElse(null);
+    }
+
+    private WebElement requireRequestRow(LocalDate date, String leaveType, String comment) {
+        WebElement row = matchingRequestRow(date, leaveType, comment);
+        if (row == null) {
+            throw new AssertionError("No My Leave row found for date " + date + ", leave type "
+                    + leaveType + " and comment " + comment);
+        }
+        return row;
+    }
+
+    private String cellValue(WebElement row, String expectedHeader) {
+        List<WebElement> headers = elements(tableHeaders);
+        List<WebElement> cells = row.findElements(tableCells);
+        for (int index = 0; index < headers.size(); index++) {
+            if (headers.get(index).getText().trim().toLowerCase(Locale.ROOT)
+                    .contains(expectedHeader)) {
+                if (index >= cells.size()) {
+                    throw new IllegalStateException("My Leave row is missing its " + expectedHeader + " cell");
+                }
+                return cells.get(index).getText().trim();
+            }
+        }
+        throw new IllegalStateException("My Leave table does not contain a " + expectedHeader + " column");
+    }
+
+    private void waitForSearchResults() {
+        wait.until(currentDriver -> {
+            boolean loading = currentDriver.findElements(tableLoader).stream()
+                    .anyMatch(WebElement::isDisplayed);
+            boolean hasResult = currentDriver.findElements(requestRows).stream()
+                    .anyMatch(WebElement::isDisplayed)
+                    || currentDriver.findElements(noRecordsMessage).stream()
+                    .anyMatch(WebElement::isDisplayed);
+            return !loading && hasResult;
+        });
     }
 
     private boolean isMyLeaveUrl(String url) {
