@@ -1,0 +1,7 @@
+baseUrl=https://opensource-demo.orangehrmlive.com/
+browser=chrome
+headless=false
+explicitWaitSeconds=15
+username=
+password=
+reportPath=target/extent-report.html

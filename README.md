@@ -13,7 +13,13 @@ WebDriverManager resolves the matching browser driver. Chrome is the default bro
 
 ## Configuration
 
-Runtime settings are loaded from `src/test/resources/config.properties`. Copy `src/test/resources/config.properties.example` to `src/test/resources/config.properties`, then enter your username and password in that local file. The real config file is Git-ignored to prevent credentials from being committed. Override values with a JVM property or an environment variable prefixed with `ORANGEHRM_`. `baseUrl` must be configured; it has no code-level fallback.
+Runtime settings are loaded from `src/test/resources/config.properties`. Copy `src/test/resources/config.properties.example` to `src/test/resources/config.properties`, then enter the demo username and password in that local file. The real config file is Git-ignored to prevent credentials from being committed. Each recipient must supply their own credentials; do not email credentials or include `config.properties` in the project archive. Override values with a JVM property or an environment variable prefixed with `ORANGEHRM_`. `baseUrl` must be configured; it has no code-level fallback.
+
+On Windows PowerShell, create the local configuration file with:
+
+```powershell
+Copy-Item src\test\resources\config.properties.example src\test\resources\config.properties
+```
 
 | Setting | Default | Example override |
 | --- | --- | --- |
@@ -45,6 +51,12 @@ src/test/resources/
 The driver uses explicit waits and zero implicit wait. Employee results are located by meaningful row content, not row index. Test data uses a unique timestamp suffix. Employee cleanup is attempted after scenarios that create employees; because the public demo is shared and permissions can vary, cleanup is best-effort. The valid leave test submits a one-day request, verifies its comment and calculated duration, then cancels the pending request to avoid leaving it active. Use a dedicated test account where possible.
 
 ## Execute Tests
+
+From the project directory, after installing the prerequisites and creating `config.properties`, run:
+
+```powershell
+mvn clean test
+```
 
 Run all discovered tests:
 
