@@ -23,16 +23,33 @@ public class MyLeavePage extends BasePage {
     private final By fromDate = By.xpath("//label[normalize-space()='From Date']/following::input[1]");
     private final By statusFilter = By.xpath(
             "//label[contains(normalize-space(),'Show Leave with Status')]/following::div[contains(@class,'oxd-multiselect-wrapper')][1]");
-    private final By rejectedStatusChip = statusChip("Rejected");
-    private final By cancelledStatusChip = statusChip("Cancelled");
-    private final By scheduledStatusChip = statusChip("Scheduled");
-    private final By takenStatusChip = statusChip("Taken");
-    private final By pendingApprovalStatusChip = statusChip("Pending Approval");
+    private final By rejectedStatusChip = By.xpath(
+            ".//div[contains(@class,'oxd-multiselect-chips-area')]/span"
+                    + "[contains(@class,'oxd-multiselect-chips-selected') and normalize-space()='Rejected']");
+    private final By cancelledStatusChip = By.xpath(
+            ".//div[contains(@class,'oxd-multiselect-chips-area')]/span"
+                    + "[contains(@class,'oxd-multiselect-chips-selected') and normalize-space()='Cancelled']");
+    private final By scheduledStatusChip = By.xpath(
+            ".//div[contains(@class,'oxd-multiselect-chips-area')]/span"
+                    + "[contains(@class,'oxd-multiselect-chips-selected') and normalize-space()='Scheduled']");
+    private final By takenStatusChip = By.xpath(
+            ".//div[contains(@class,'oxd-multiselect-chips-area')]/span"
+                    + "[contains(@class,'oxd-multiselect-chips-selected') and normalize-space()='Taken']");
+    private final By pendingApprovalStatusChip = By.xpath(
+            ".//div[contains(@class,'oxd-multiselect-chips-area')]/span"
+                    + "[contains(@class,'oxd-multiselect-chips-selected') and normalize-space()='Pending Approval']");
     private final By calendarWrapper = By.cssSelector(".oxd-calendar-wrapper");
     private final By calendarMonthSelector = By.cssSelector(".oxd-calendar-selector-month");
+    private final By calendarOptions = By.cssSelector(".oxd-calendar-wrapper *");
+    private final By calendarDateCells = By.xpath(
+            ".//*[contains(@class,'oxd-calendar-date') and not(contains(@class,'--other-month'))]");
+    private final By selectedStatusChips = By.cssSelector(
+            ".oxd-multiselect-chips-area .oxd-chip.oxd-multiselect-chips-selected");
+    private final By clearChipIcon = By.cssSelector("i.oxd-icon.bi-x.--clear");
     private final By tableHeaders = By.cssSelector(".oxd-table-header .oxd-table-cell");
     private final By tableCells = By.cssSelector(".oxd-table-cell");
     private final By requestRows = By.cssSelector(".oxd-table-card");
+    private final By cancelButton = By.xpath(".//button[normalize-space()='Cancel']");
 
     public MyLeavePage(WebDriver driver) {
         super(driver);
@@ -65,9 +82,9 @@ public class MyLeavePage extends BasePage {
         WebElement monthOption = wait.until(currentDriver ->
                 currentDriver.findElements(calendarWrapper).stream()
                         .filter(WebElement::isDisplayed)
-                        .flatMap(calendar -> calendar.findElements(By.xpath(
-                                ".//*[normalize-space()='" + monthName + "']")).stream())
+                        .flatMap(calendar -> calendar.findElements(calendarOptions).stream())
                         .filter(WebElement::isDisplayed)
+                        .filter(option -> option.getText().trim().equals(monthName))
                         .filter(option -> !String.valueOf(option.getAttribute("class"))
                                 .contains("oxd-calendar-selector-month"))
                         .findFirst()
@@ -75,13 +92,11 @@ public class MyLeavePage extends BasePage {
         monthOption.click();
 
         String dayOfMonth = Integer.toString(date.getDayOfMonth());
-        By calendarDay = By.xpath(".//*[contains(@class,'oxd-calendar-date') and normalize-space()='"
-                + dayOfMonth + "' and not(contains(@class,'--other-month'))]");
         WebElement day = wait.until(currentDriver ->
                 currentDriver.findElements(calendarWrapper).stream()
+                        .flatMap(calendar -> calendar.findElements(calendarDateCells).stream())
                         .filter(WebElement::isDisplayed)
-                        .flatMap(calendar -> calendar.findElements(calendarDay).stream())
-                        .filter(WebElement::isDisplayed)
+                        .filter(calendarDate -> calendarDate.getText().trim().equals(dayOfMonth))
                         .findFirst()
                         .orElse(null));
         day.click();
@@ -99,8 +114,7 @@ public class MyLeavePage extends BasePage {
         removeStatusChip(takenStatusChip);
 
         List<String> selectedStatuses = visible(statusFilter)
-                .findElements(By.cssSelector(
-                        ".oxd-multiselect-chips-area .oxd-chip.oxd-multiselect-chips-selected"))
+                .findElements(selectedStatusChips)
                 .stream()
                 .map(WebElement::getText)
                 .map(String::trim)
@@ -119,7 +133,7 @@ public class MyLeavePage extends BasePage {
             return;
         }
 
-        WebElement clearIcon = chips.get(0).findElement(By.cssSelector("i.oxd-icon.bi-x.--clear"));
+        WebElement clearIcon = chips.get(0).findElement(clearChipIcon);
         ((JavascriptExecutor) driver).executeScript(
                 "arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", clearIcon);
         wait.until(ExpectedConditions.elementToBeClickable(clearIcon)).click();
@@ -128,12 +142,6 @@ public class MyLeavePage extends BasePage {
 
     private List<WebElement> elementsWithin(By parentLocator, By childLocator) {
         return visible(parentLocator).findElements(childLocator);
-    }
-
-    private static By statusChip(String status) {
-        return By.xpath(".//div[contains(@class,'oxd-multiselect-chips-area')]/span"
-                + "[contains(@class,'oxd-multiselect-chips-selected') and normalize-space()='"
-                + status + "']");
     }
 
     public boolean containsRequest(LocalDate date, String leaveType) {
@@ -155,7 +163,7 @@ public class MyLeavePage extends BasePage {
 
     public boolean requestHasCancelButton(LocalDate date, String leaveType) {
         WebElement row = matchingRequestRow(date, leaveType);
-        return row != null && row.findElements(By.xpath(".//button[normalize-space()='Cancel']")).stream()
+        return row != null && row.findElements(cancelButton).stream()
                 .anyMatch(WebElement::isDisplayed);
     }
 

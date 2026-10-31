@@ -19,7 +19,9 @@ public class LeavePage extends BasePage {
             "//label[normalize-space()='Duration']/following::div[contains(@class,'oxd-select-text')][1]");
     private final By fromDate = By.xpath("//label[normalize-space()='From Date']/following::input[1]");
     private final By toDate = By.xpath("//label[normalize-space()='To Date']/following::input[1]");
+    private final By commentsField = By.xpath("//label[normalize-space()='Comments']/following::textarea[1]");
     private final By submitButton = By.xpath("//button[@type='submit' and normalize-space()='Apply']");
+    private final By fieldErrors = FIELD_ERROR;
 
     public LeavePage(WebDriver driver) {
         super(driver);
@@ -92,8 +94,7 @@ public class LeavePage extends BasePage {
     }
 
     public void addComment(String comment) {
-        By commentField = By.xpath("//label[normalize-space()='Comments']/following::textarea[1]");
-        replaceText(commentField, comment);
+        replaceText(commentsField, comment);
     }
 
     public void submitRequest() {
@@ -101,10 +102,8 @@ public class LeavePage extends BasePage {
     }
 
     public String waitForSubmissionFeedback() {
-        By notification = By.cssSelector(".oxd-toast-content-text");
-        By fieldErrors = By.cssSelector(".oxd-input-field-error-message");
         return wait.until(driver -> {
-            String notificationText = driver.findElements(notification).stream()
+            String notificationText = driver.findElements(NOTIFICATION).stream()
                     .filter(WebElement::isDisplayed)
                     .map(WebElement::getText)
                     .filter(text -> !text.isBlank())
@@ -125,8 +124,8 @@ public class LeavePage extends BasePage {
     }
 
     public boolean hasDateValidation() {
-        return visibleWithin(By.cssSelector(".oxd-input-field-error-message"), 3)
-            || visibleWithin(By.cssSelector(".oxd-toast--error"), 1);
+        return visibleWithin(FIELD_ERROR, 3)
+            || visibleWithin(ERROR_TOAST, 1);
     }
 
 }

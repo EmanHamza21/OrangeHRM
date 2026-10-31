@@ -6,6 +6,7 @@ import org.openqa.selenium.WebDriver;
 public class DashboardPage extends BasePage {
     private final By dashboardHeading = By.xpath("//h6[normalize-space()='Dashboard']");
     private final By loggedInUser = By.cssSelector(".oxd-userdropdown-name");
+    private final By leaveNavigation = By.xpath("//span[normalize-space()='Leave']");
 
     public DashboardPage(WebDriver driver) {
         super(driver);
@@ -19,11 +20,7 @@ public class DashboardPage extends BasePage {
         return visible(loggedInUser).getText();
     }
 
-    public void openPim() {
-        click(By.xpath("//span[normalize-space()='PIM']"));
-    }
-
     public void openLeave() {
-        click(By.xpath("//span[normalize-space()='Leave']"));
+        click(leaveNavigation);
     }
 }
