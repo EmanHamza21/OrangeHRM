@@ -56,17 +56,21 @@ public class MyLeavePage extends BasePage {
     private final By tableLoader = By.cssSelector(".oxd-table-loader");
     private final By noRecordsMessage = By.xpath("//*[contains(normalize-space(), 'No Records Found')]");
 
+    // constructor
+    // initialize the MyLeavePage with the given WebDriver
     public MyLeavePage(WebDriver driver) {
         super(driver);
     }
 
     public void open() {
         String currentUrl = driver.getCurrentUrl();
+        // if the current URL is not the My Leave page, click the My Leave tab and wait for the URL to change
         if (!isMyLeaveUrl(currentUrl)) {
             click(myLeaveTab);
             wait.until(currentDriver -> !currentDriver.getCurrentUrl().equals(currentUrl)
                     && isMyLeaveUrl(currentDriver.getCurrentUrl()));
         }
+        // wait for the search button to be visible, indicating that the page has loaded
         wait.until(currentDriver -> isMyLeaveUrl(currentDriver.getCurrentUrl())
                 && currentDriver.findElements(searchButton).stream().anyMatch(WebElement::isDisplayed));
     }
@@ -75,6 +79,7 @@ public class MyLeavePage extends BasePage {
         return isMyLeaveUrl(driver.getCurrentUrl()) && visibleWithin(searchButton, 2);
     }
 
+    // search for leave requests with the given from date and retain only the "Pending Approval" status
     public void searchFromDateWithPendingApproval(LocalDate date) {
         String expectedDate = date.format(ORANGEHRM_DATE);
         visible(fromDate).click();
@@ -85,6 +90,7 @@ public class MyLeavePage extends BasePage {
 
         String monthName = date.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
         WebElement monthOption = wait.until(currentDriver ->
+            // find the first visible calendar option that matches the month name and is not the month selector itself
                 currentDriver.findElements(calendarWrapper).stream()
                         .filter(WebElement::isDisplayed)
                         .flatMap(calendar -> calendar.findElements(calendarOptions).stream())
@@ -126,6 +132,7 @@ public class MyLeavePage extends BasePage {
                 .map(String::trim)
                 .filter(status -> !status.isEmpty())
                 .toList();
+                // verify that only "Pending Approval" is selected
         if (!selectedStatuses.equals(List.of("Pending Approval"))
                 || elementsWithin(statusFilter, pendingApprovalStatusChip).size() != 1) {
             throw new IllegalStateException(
@@ -133,6 +140,7 @@ public class MyLeavePage extends BasePage {
         }
     }
 
+    // remove the status chip identified by the given locator from the status filter
     private void removeStatusChip(By chipLocator) {
         List<WebElement> chips = elementsWithin(statusFilter, chipLocator);
         if (chips.isEmpty()) {
@@ -150,24 +158,29 @@ public class MyLeavePage extends BasePage {
         return visible(parentLocator).findElements(childLocator);
     }
 
+    // check if there is a leave request row that matches the given date and leave type
     public boolean containsRequest(LocalDate date, String leaveType) {
         return matchingRequestRow(date, leaveType) != null;
     }
 
+    // check if there is a leave request row that matches the given date, leave type, and comment
     public boolean containsRequest(LocalDate date, String leaveType, String comment) {
         return matchingRequestRow(date, leaveType, comment) != null;
     }
 
+    // get the number of days for the leave request that matches the given date, leave type, and comment
     public String requestNumberOfDays(LocalDate date, String leaveType, String comment) {
         WebElement row = requireRequestRow(date, leaveType, comment);
         return cellValue(row, "number of days");
     }
 
+    //  get the comment for the leave request that matches the given date, leave type, and comment
     public boolean requestHasComment(LocalDate date, String leaveType, String comment) {
         WebElement row = matchingRequestRow(date, leaveType, comment);
         return row != null && row.getText().contains(comment);
     }
 
+    // cancel the leave request that matches the given date, leave type, and comment, and return the feedback message
     public String cancelRequest(LocalDate date, String leaveType, String comment) {
         WebElement row = requireRequestRow(date, leaveType, comment);
         row.findElement(cancelButton).click();
